@@ -391,6 +391,7 @@ function renderEditableTask(task) {
         <span class="edit-date-cell" onpointerdown="openEditDate(event, '${task.id}')"><input id="edit-date-${task.id}" type="date" value="${escapeHtml(task.dueDate)}" /></span>
         <span class="row-actions">
           <button class="cancel-edit-hover" type="button" aria-label="Cancel editing" onclick="cancelTaskEdit()"></button>
+          <button class="delete-edit-hover" type="button" aria-label="Delete task" onclick="deleteTask('${task.id}')"></button>
         </span>
       </summary>
       <div class="task-details">

@@ -467,7 +467,8 @@ textarea:focus {
 .undo-hover,
 .task-hover,
 .edit-hover,
-.cancel-edit-hover {
+.cancel-edit-hover,
+.delete-edit-hover {
   align-items: center;
   border-radius: 999px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
@@ -527,6 +528,14 @@ textarea:focus {
   transform: scale(1);
 }
 
+.delete-edit-hover {
+  background: rgba(251, 113, 133, 0.14);
+  border: 1px solid rgba(251, 113, 133, 0.48);
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
 .edit-hover::before {
   background: #99f6e4;
   border-radius: 2px;
@@ -561,6 +570,48 @@ textarea:focus {
 
 .cancel-edit-hover::after {
   transform: rotate(-45deg);
+}
+
+.delete-edit-hover::before {
+  border: 2px solid #fda4af;
+  border-top: 0;
+  border-radius: 0 0 3px 3px;
+  content: "";
+  height: 0.68rem;
+  transform: translateY(0.16rem);
+  width: 0.72rem;
+}
+
+.delete-edit-hover::after {
+  background:
+    linear-gradient(#fda4af, #fda4af) center top / 0.75rem 2px no-repeat,
+    linear-gradient(#fda4af, #fda4af) center 0.22rem / 0.42rem 2px no-repeat;
+  content: "";
+  height: 0.4rem;
+  position: absolute;
+  top: 0.48rem;
+  width: 0.9rem;
+}
+
+.later-hover::before {
+  border: 2px solid #7dd3fc;
+  border-radius: 999px;
+  content: "";
+  height: 0.88rem;
+  width: 0.88rem;
+}
+
+.later-hover::after {
+  background:
+    linear-gradient(#7dd3fc, #7dd3fc) center 0.3rem / 2px 0.42rem no-repeat,
+    linear-gradient(#7dd3fc, #7dd3fc) 0.58rem 0.66rem / 0.36rem 2px no-repeat;
+  content: "";
+  height: 1rem;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1rem;
 }
 
 .task-hover::before {
@@ -608,39 +659,20 @@ textarea:focus {
   width: 0.68rem;
 }
 
-.later-hover::before {
-  border: 2px solid #7dd3fc;
-  border-radius: 999px;
-  content: "";
-  height: 0.88rem;
-  width: 0.88rem;
-}
-
-.later-hover::after {
-  background:
-    linear-gradient(#7dd3fc, #7dd3fc) center 0.3rem / 2px 0.42rem no-repeat,
-    linear-gradient(#7dd3fc, #7dd3fc) 0.58rem 0.66rem / 0.36rem 2px no-repeat;
-  content: "";
-  height: 1rem;
-  left: 50%;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 1rem;
-}
-
 .task-row:hover .done-hover,
 .task-row:hover .later-hover,
 .task-row:hover .undo-hover,
 .task-row:hover .task-hover,
 .task-row:hover .edit-hover,
 .task-row:hover .cancel-edit-hover,
+.task-row:hover .delete-edit-hover,
 .done-hover:focus-visible,
 .later-hover:focus-visible,
 .undo-hover:focus-visible,
 .task-hover:focus-visible,
 .edit-hover:focus-visible,
-.cancel-edit-hover:focus-visible {
+.cancel-edit-hover:focus-visible,
+.delete-edit-hover:focus-visible {
   opacity: 1;
   pointer-events: auto;
   transform: scale(1);
@@ -674,6 +706,11 @@ textarea:focus {
 
 .cancel-edit-hover:hover,
 .cancel-edit-hover:focus-visible {
+  background: rgba(251, 113, 133, 0.24);
+}
+
+.delete-edit-hover:hover,
+.delete-edit-hover:focus-visible {
   background: rgba(251, 113, 133, 0.24);
 }
 
