@@ -1,6 +1,9 @@
 let tasks = [];
-let sortState = { key: "", direction: "asc" };
+let sortState = { key: "dueDate", direction: "asc" };
 let editingTaskId = "";
+let expandedTaskId = "";
+let toastTimer;
+const openSpaces = new Set(JSON.parse(localStorage.getItem("taskOpenSpaces") || '["Tasks"]'));
 
 const DEFAULT_TEAMS = ["Admin", "Client Success", "Data Science", "Hamid", "IT", "Product", "Suhail"];
 
@@ -19,6 +22,8 @@ const teamCustom = document.querySelector("#teamCustom");
 const teamFilter = document.querySelector("#teamFilter");
 const priorityFilter = document.querySelector("#priorityFilter");
 const searchInput = document.querySelector("#searchInput");
+const textSizeButtons = document.querySelectorAll(".text-size-btn");
+const toast = document.querySelector("#toast");
 
 function dbToTask(row) {
   return {
@@ -72,6 +77,55 @@ function syncTeamCustom() {
 
 function selectedFormTeam() {
   return teamSelect.value === "__add__" ? teamCustom.value.trim() : teamSelect.value;
+}
+
+function setTextSize(size) {
+  const allowedSizes = ["xs", "sm", "md", "lg"];
+  const nextSize = allowedSizes.includes(size) ? size : "sm";
+  document.body.dataset.textSize = nextSize;
+  localStorage.setItem("taskTextSize", nextSize);
+
+  textSizeButtons.forEach(button => {
+    const active = button.dataset.size === nextSize;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function showToast(message) {
+  window.clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.classList.add("is-visible");
+  toastTimer = window.setTimeout(() => {
+    toast.classList.remove("is-visible");
+  }, 2200);
+}
+
+function persistOpenSpaces() {
+  localStorage.setItem("taskOpenSpaces", JSON.stringify([...openSpaces]));
+}
+
+function smoothRender() {
+  if (document.startViewTransition) {
+    document.startViewTransition(() => render());
+    return;
+  }
+
+  render();
+}
+
+function replaceTask(id, updates) {
+  tasks = tasks.map(task => task.id === id ? { ...task, ...updates } : task);
+}
+
+function taskSnapshot() {
+  return tasks.map(task => ({ ...task }));
+}
+
+function restoreTasks(snapshot, message) {
+  tasks = snapshot;
+  smoothRender();
+  if (message) showToast(message);
 }
 
 async function loadTasks() {
@@ -161,7 +215,12 @@ function escapeHtml(value = "") {
 function formatDate(dateString) {
   if (!dateString) return "";
   const date = new Date(`${dateString}T00:00:00`);
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
 }
 
 function todayString() {
@@ -290,14 +349,14 @@ function changeSort(key) {
     sortState = { key, direction: "asc" };
   }
 
-  render();
+  smoothRender();
 }
 
 function renderTaskSpace(title, taskList, emptyText) {
-  const openAttr = title === "Tasks" ? " open" : "";
+  const openAttr = openSpaces.has(title) ? " open" : "";
 
   return `
-    <details class="task-space"${openAttr}>
+    <details class="task-space"${openAttr} data-space="${escapeHtml(title)}">
       <summary class="space-title-row">
         <h2>${escapeHtml(title)}</h2>
         <span>${taskList.length}</span>
@@ -340,15 +399,15 @@ function renderTask(task) {
   const editHoverButton = `<button class="edit-hover" type="button" aria-label="Edit ${escapeHtml(task.title)}" onclick="startTaskEdit(event, '${task.id}')"></button>`;
 
   return `
-    <details class="task-row ${overdue ? "is-overdue" : ""} ${task.notes ? "has-notes-row" : "no-notes-row"}" data-task-id="${task.id}">
+    <details class="task-row ${overdue ? "is-overdue" : ""} ${task.notes ? "has-notes-row" : "no-notes-row"}" data-task-id="${task.id}" ${expandedTaskId === task.id ? "open" : ""}>
       <summary class="task-summary" ${task.notes ? "" : `onclick="blockEmptyNotesExpand(event)"`}>
         <span class="task-title">${escapeHtml(task.title)}</span>
         <span>${escapeHtml(task.team || "-")}</span>
         <span>${escapeHtml(task.poc || "-")}</span>
         <span><span class="badge ${priorityClass}">${escapeHtml(task.priority || "Medium")}</span></span>
         <span class="date-cell">
-          ${escapeHtml(dateLabel)}
-          ${overdue ? "<strong>Overdue</strong>" : ""}
+          <span class="date-label">${escapeHtml(dateLabel)}</span>
+          ${overdue ? `<span class="overdue-label">Overdue</span>` : ""}
         </span>
         <span class="row-actions">
           ${laterHoverButton}
@@ -371,7 +430,7 @@ function renderTask(task) {
 function renderEditableTask(task) {
   const customTeam = task.team && !allTeams().includes(task.team);
   return `
-    <details class="task-row is-editing" open>
+    <details class="task-row is-editing" open data-task-id="${task.id}">
       <summary class="task-summary">
         <span><input id="edit-title-${task.id}" value="${escapeHtml(task.title)}" /></span>
         <span>
@@ -390,8 +449,8 @@ function renderEditableTask(task) {
         </span>
         <span class="edit-date-cell" onpointerdown="openEditDate(event, '${task.id}')"><input id="edit-date-${task.id}" type="date" value="${escapeHtml(task.dueDate)}" /></span>
         <span class="row-actions">
-          <button class="cancel-edit-hover" type="button" aria-label="Cancel editing" onclick="cancelTaskEdit()"></button>
-          <button class="delete-edit-hover" type="button" aria-label="Delete task" onclick="deleteTask('${task.id}')"></button>
+          <button class="cancel-edit-hover" type="button" aria-label="Cancel editing" onclick="cancelTaskEdit(event)"></button>
+          <button class="delete-edit-hover" type="button" aria-label="Delete task" onclick="deleteTask(event, '${task.id}')"></button>
         </span>
       </summary>
       <div class="task-details">
@@ -399,7 +458,7 @@ function renderEditableTask(task) {
           <textarea id="edit-notes-${task.id}" rows="6" placeholder="Add detailed notes...">${escapeHtml(task.notes)}</textarea>
           <div class="inline-actions">
             <button type="submit">Save task</button>
-            <button class="secondary" type="button" onclick="cancelTaskEdit()">Cancel</button>
+            <button class="secondary" type="button" onclick="cancelTaskEdit(event)">Cancel</button>
           </div>
         </form>
       </div>
@@ -431,25 +490,38 @@ async function upsertTask(task) {
     return;
   }
 
-  await loadTasks();
+  const savedTask = dbToTask(result.data);
+  if (task.id) {
+    replaceTask(task.id, savedTask);
+  } else {
+    tasks = [savedTask, ...tasks];
+    openSpaces.add("Tasks");
+    persistOpenSpaces();
+  }
+  smoothRender();
+  showToast(task.id ? "Task updated" : "Task added");
 }
 
 function closeOtherTaskRows(currentRow) {
   document.querySelectorAll(".task-row[open]").forEach(row => {
     if (row !== currentRow) row.open = false;
   });
+  expandedTaskId = currentRow?.dataset.taskId || "";
 }
 
 function startTaskEdit(event, id) {
   event.preventDefault();
   event.stopPropagation();
   editingTaskId = id;
-  render();
+  expandedTaskId = "";
+  smoothRender();
 }
 
-function cancelTaskEdit() {
+function cancelTaskEdit(event) {
+  event?.preventDefault();
+  event?.stopPropagation();
   editingTaskId = "";
-  render();
+  smoothRender();
 }
 
 function toggleInlineTeam(id) {
@@ -510,36 +582,52 @@ async function saveTaskEdit(event, id) {
     return;
   }
 
+  replaceTask(id, {
+    title: payload.title,
+    team: payload.team || "",
+    poc: payload.poc || "",
+    priority: payload.priority,
+    dueDate: payload.due_date || "",
+    notes: payload.notes || "",
+    updatedAt: payload.updated_at
+  });
   editingTaskId = "";
-  await loadTasks();
+  expandedTaskId = payload.notes ? id : "";
+  smoothRender();
+  showToast("Task saved");
 }
 
 function editTask(id) {
   editingTaskId = id;
-  render();
+  expandedTaskId = "";
+  smoothRender();
 }
 
-async function deleteTask(id) {
+async function deleteTask(event, id) {
+  event?.preventDefault();
+  event?.stopPropagation();
+
+  const task = tasks.find(item => item.id === id);
+  const noteWarning = task?.notes ? " This will also delete its notes." : "";
+  const confirmed = window.confirm(`Delete "${task?.title || "this task"}"?${noteWarning}`);
+  if (!confirmed) return;
+
+  const snapshot = taskSnapshot();
+  tasks = tasks.filter(task => task.id !== id);
+  if (editingTaskId === id) editingTaskId = "";
+  if (expandedTaskId === id) expandedTaskId = "";
+  smoothRender();
+
   const { error } = await supabaseClient.from("tasks").delete().eq("id", id);
   if (error) {
-    alert(`Could not delete task: ${error.message}`);
+    restoreTasks(snapshot, `Could not delete task: ${error.message}`);
     return;
   }
-  await loadTasks();
+  showToast("Task deleted");
 }
 
 async function markDone(id) {
-  const { error } = await supabaseClient
-    .from("tasks")
-    .update({ status: "Done", updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) {
-    alert(`Could not mark task done: ${error.message}`);
-    return;
-  }
-
-  await loadTasks();
+  await updateTaskStatus(id, "Done", "Task completed");
 }
 
 async function quickDone(event, id) {
@@ -567,45 +655,36 @@ async function quickTask(event, id) {
 }
 
 async function markLater(id) {
-  const { error } = await supabaseClient
-    .from("tasks")
-    .update({ status: "Later", updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) {
-    alert(`Could not move task to later: ${error.message}`);
-    return;
-  }
-
-  await loadTasks();
+  await updateTaskStatus(id, "Later", "Moved to later");
 }
 
 async function markTask(id) {
-  const { error } = await supabaseClient
-    .from("tasks")
-    .update({ status: "Backlog", updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) {
-    alert(`Could not move task back: ${error.message}`);
-    return;
-  }
-
-  await loadTasks();
+  await updateTaskStatus(id, "Backlog", "Moved to tasks");
 }
 
 async function markUndone(id) {
+  await updateTaskStatus(id, "Backlog", "Marked undone");
+}
+
+async function updateTaskStatus(id, status, successMessage) {
+  const snapshot = taskSnapshot();
+  const updatedAt = new Date().toISOString();
+  replaceTask(id, { status, updatedAt });
+  if (expandedTaskId === id && status !== "Backlog") expandedTaskId = "";
+  persistOpenSpaces();
+  smoothRender();
+
   const { error } = await supabaseClient
     .from("tasks")
-    .update({ status: "Backlog", updated_at: new Date().toISOString() })
+    .update({ status, updated_at: updatedAt })
     .eq("id", id);
 
   if (error) {
-    alert(`Could not mark task undone: ${error.message}`);
+    restoreTasks(snapshot, `Could not update task: ${error.message}`);
     return;
   }
 
-  await loadTasks();
+  showToast(successMessage);
 }
 
 function startNotes(event, id) {
@@ -622,7 +701,10 @@ function startNotes(event, id) {
     return;
   }
 
-  if (row) row.open = true;
+  if (row) {
+    row.open = true;
+    closeOtherTaskRows(row);
+  }
   startExpandedNotes(event, id);
 }
 
@@ -665,24 +747,23 @@ async function saveNotes(event, id) {
 
 async function saveNotesById(id, keepOpen = false) {
   const notes = document.querySelector(`#notesInput-${CSS.escape(id)}`).value.trim();
+  const snapshot = taskSnapshot();
+  const updatedAt = new Date().toISOString();
+  replaceTask(id, { notes, updatedAt });
+  expandedTaskId = keepOpen || notes ? id : "";
+  smoothRender();
+
   const { error } = await supabaseClient
     .from("tasks")
-    .update({ notes: notes || null, updated_at: new Date().toISOString() })
+    .update({ notes: notes || null, updated_at: updatedAt })
     .eq("id", id);
 
   if (error) {
-    alert(`Could not save notes: ${error.message}`);
+    restoreTasks(snapshot, `Could not save notes: ${error.message}`);
     return;
   }
 
-  await loadTasks();
-  if (keepOpen) {
-    const row = document.querySelector(`.task-row[data-task-id="${CSS.escape(id)}"]`);
-    if (row) {
-      row.open = true;
-      closeOtherTaskRows(row);
-    }
-  }
+  showToast("Notes saved");
 }
 
 function cancelNotes(id) {
@@ -749,18 +830,37 @@ document.querySelector("#clearCompletedBtn").addEventListener("click", async () 
   const confirmed = window.confirm("Clear all done tasks? This will permanently delete completed tasks and any notes on them.");
   if (!confirmed) return;
 
+  const snapshot = taskSnapshot();
+  tasks = tasks.filter(task => task.status !== "Done");
+  smoothRender();
+
   const { error } = await supabaseClient.from("tasks").delete().eq("status", "Done");
   if (error) {
-    alert(`Could not clear done tasks: ${error.message}`);
+    restoreTasks(snapshot, `Could not clear done tasks: ${error.message}`);
     return;
   }
-  await loadTasks();
+  showToast("Done tasks cleared");
 });
 
 board.addEventListener("toggle", event => {
-  const row = event.target;
-  if (row.classList?.contains("task-row") && row.open) {
-    closeOtherTaskRows(row);
+  const target = event.target;
+  if (target.classList?.contains("task-space")) {
+    const title = target.dataset.space;
+    if (target.open) {
+      openSpaces.add(title);
+    } else {
+      openSpaces.delete(title);
+    }
+    persistOpenSpaces();
+    return;
+  }
+
+  if (target.classList?.contains("task-row")) {
+    if (target.open) {
+      closeOtherTaskRows(target);
+    } else if (expandedTaskId === target.dataset.taskId) {
+      expandedTaskId = "";
+    }
   }
 }, true);
 
@@ -793,6 +893,7 @@ document.addEventListener("pointerdown", event => {
   document.querySelectorAll(".task-row[open]").forEach(row => {
     row.open = false;
   });
+  expandedTaskId = "";
 });
 
 teamSelect.addEventListener("change", syncTeamCustom);
@@ -806,6 +907,10 @@ document.querySelector("#importJsonInput").addEventListener("change", event => {
 [searchInput, teamFilter, priorityFilter].forEach(element => {
   element.addEventListener("input", render);
   element.addEventListener("change", render);
+});
+
+textSizeButtons.forEach(button => {
+  button.addEventListener("click", () => setTextSize(button.dataset.size));
 });
 
 window.editTask = editTask;
@@ -833,5 +938,6 @@ window.cancelNotes = cancelNotes;
 window.startExpandedNotes = startExpandedNotes;
 window.cancelExpandedNotes = cancelExpandedNotes;
 
+setTextSize(localStorage.getItem("taskTextSize") || "xs");
 loadTasks();
 resetForm();

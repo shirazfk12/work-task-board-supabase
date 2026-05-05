@@ -2,16 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Work Task Board</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body data-text-size="xs">
   <header class="app-header">
     <div>
       <h1>Work Tasks</h1>
     </div>
     <div class="header-actions">
+      <div class="text-size-control" aria-label="Text size">
+        <button class="text-size-btn text-size-xs" type="button" data-size="xs" aria-label="Extra small text">A</button>
+        <button class="text-size-btn text-size-sm" type="button" data-size="sm" aria-label="Small text">A</button>
+        <button class="text-size-btn text-size-md" type="button" data-size="md" aria-label="Medium text">A</button>
+        <button class="text-size-btn text-size-lg" type="button" data-size="lg" aria-label="Large text">A</button>
+      </div>
       <button id="openTaskFormBtn">Add task</button>
       <button id="exportJsonBtn" class="secondary">Export JSON</button>
       <label class="secondary file-label">
@@ -103,6 +109,8 @@
       <div id="board" class="task-spaces" aria-live="polite"></div>
     </section>
   </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
